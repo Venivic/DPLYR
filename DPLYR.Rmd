@@ -1,0 +1,255 @@
+---
+title: "DPLYR"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Chargement des packages dplyr et  nycflights13 
+
+Tout d'abord pour dplyr, il faut telecharger le package via la commande suivante : 
+
+``` {r}
+#install.packages("tidyverse")
+```
+
+```{r eval=FALSE}
+# NOUS ALLONS PRENDRE LE DATASHEET SUR LES VOLS INTERIEURS AU USA 
+rm(flights)
+```
+
+install.packages("tidyverse")
+```{r}
+#install.packages("tidyverse")
+#install.packages("nycflights13")
+# chargement des librairies 
+library(tidyverse)
+
+library(nycflights13) 
+# Nous allons imprimer le jeu de données de vols de nycflights13
+head(flights)
+```
+
+
+## Choosing columns: select, rename
+
+```{r}
+#  en plus d'utiliser simplement select () pour choisir des colonnes ...
+flights %>% select(carrier, flight)
+# ... on peut utiliser le signe - pour cacher des colonnes 
+flights %>% select(-month, -day)
+```
+
+```{r results='hide'}
+# cacher une rangée de colonne 
+flights %>% select(-(dep_time:arr_delay))
+# cacher toutes les colonnes qui contiennent un mot 
+flights %>% select(-contains("time"))
+```
+
+```{r}
+# Choisir une colonne qui permet de prendre des colonnes en utilisant un vecteur de caractères de noms de colonnes
+cols <- c("carrier", "flight", "tailnum")
+flights %>% select(one_of(cols))
+```
+
+```{r}
+# select () peut être utilisé pour renommer les colonnes, bien que toutes les colonnes non mentionnées soient supprimées
+flights %>% select(tail = tailnum)
+# rename () fait la même chose, sauf que toutes les colonnes non mentionnées sont conservées
+flights %>% rename(tail = tailnum)
+```
+
+
+## Choix des lignes : filter, between, slice, sample_n, top_n, distinct
+
+```{r}
+# filter() supporte l'utilisation de multiples conditions 
+flights %>% filter(dep_time >= 600, dep_time <= 605)
+```
+
+```{r results='hide'}
+# between() est une alternative concise pour déterminer si les valeurs numériques tombent dans une plage
+flights %>% filter(between(dep_time, 600, 605))
+# note latérale: is.na () peut également être utile lors du filtrage
+flights %>% filter(!is.na(dep_time))
+```
+
+
+```{r}
+# slice() filtrer les lignes par position 
+flights %>% slice(1000:1005)
+#Garde les trois  premieres rangées de ligne de chaque groupe
+flights %>% group_by(month, day) %>% slice(1:3)
+# echantillonner trois lignes de chaque groupe
+flights %>% group_by(month, day) %>% sample_n(3)
+# garder trois lignes de chaque groupe avec le dep_delay supérieur
+flights %>% group_by(month, day) %>% top_n(3, dep_delay)
+# trier également par dep_delay dans chaque groupe
+flights %>% group_by(month, day) %>% top_n(3, dep_delay) %>% arrange(desc(dep_delay))
+```
+
+
+```{r}
+#les lignes uniques peuvent être identifiées en utilisant unique () à partir de la base R
+flights %>% select(origin, dest) %>% unique()
+```
+
+```{r results='hide'}
+# dplyr propose une alternative plus "efficace"
+flights %>% select(origin, dest) %>% distinct()
+# remarque: lors du chaînage, vous n'avez pas besoin d'inclure les parenthèses s'il n'y a pas d'arguments
+flights %>% select(origin, dest) %>% distinct
+```
+
+
+## Ajouter de nouvelles variables : mutate, transmute, add_rownames
+
+```{r}
+# mutate () crée une nouvelle variable (et conserve toutes les variables existantes)
+flights %>% mutate(speed = distance/air_time*60)
+# transmute() garde seulement les nouvelles variables
+flights %>% transmute(speed = distance/air_time*60)
+```
+
+
+```{r}
+# exemple data frame avec des noms de ligne 
+mtcars %>% head()
+# add_rownames() transforme le nom des lignes en variable explicite 
+mtcars %>% add_rownames("model") %>% head()
+# side note: dplyr n'imprime plus les noms de lignes pour les trames de données locales
+mtcars %>% tbl_df()
+```
+
+
+## Fonction de groupe et de compte g: summarise, tally, count, group_size, n_groups, ungroup
+
+```{r}
+# summarise() peut etre utiliser pour compter le nombre de lignes de chaque groupe 
+flights %>% group_by(month) %>% summarise(cnt = n())
+```
+
+```{r results='hide'}
+# tally() et count() peuvent le faire de manière plus précise
+flights %>% group_by(month) %>% tally()
+flights %>% count(month)
+```
+
+```{r}
+# vous pouvez trier par le nombre
+flights %>% group_by(month) %>% summarise(cnt = n()) %>% arrange(desc(cnt))
+```
+
+```{r results='hide'}
+# tally () et count () ont un paramètre de tri à cet effet
+flights %>% group_by(month) %>% tally(sort=TRUE)
+flights %>% count(month, sort=TRUE)
+```
+
+```{r}
+# vous pouvez additionner une variable spécifique au lieu de simplement compter les lignes
+flights %>% group_by(month) %>% summarise(dist = sum(distance))
+```
+
+```{r results='hide'}
+#tally () et count () ont un paramètre wt à cet effet
+flights %>% group_by(month) %>% tally(wt = distance)
+flights %>% count(month, wt = distance)
+```
+
+```{r}
+#group_size () renvoie les décomptes sous forme de vecteur
+flights %>% group_by(month) %>% group_size()
+# n_groups () rapporte simplement le nombre de groupes
+flights %>% group_by(month) %>% n_groups()
+```
+
+```{r}
+# grouper par deux variables, résumer, organiser (la sortie est peut-être déroutante)
+flights %>% group_by(month, day) %>% summarise(cnt = n()) %>% arrange(desc(cnt)) %>% print(n = 40)
+# dégrouper () avant d'arranger pour organiser dans tous les groupes
+flights %>% group_by(month, day) %>% summarise(cnt = n()) %>% ungroup() %>% arrange(desc(cnt))
+```
+
+
+## Création de trames de données: data_frame
+
+`data_frame ()` est un meilleur moyen que `data.frame ()` pour créer des tableaux de données. Avantages de `data_frame ()`:
+
+* Vous pouvez utiliser des colonnes précédemment définies pour calculer de nouvelles colonnes.
+* Il ne contraint jamais les types de colonnes.
+* Il ne brouille jamais les noms de colonnes.
+* Il n'ajoute jamais de noms de ligne.
+* Il ne recycle que l'entrée de longueur 1.
+* Il renvoie une trame de données locale (un tbl_df).
+
+```{r}
+# data_frame() 
+data_frame(a = 1:6, b = a*2, c = 'string', 'd+e' = 1) %>% glimpse()
+# data.frame() 
+data.frame(a = 1:6, c = 'string', 'd+e' = 1) %>% glimpse()
+```
+
+
+## Joindre des tables (merging): left_join, right_join, inner_join, full_join, semi_join, anti_join
+
+```{r}
+# creation  deux si dataframes 
+(a <- data_frame(color = c("green","yellow","red"), num = 1:3))
+(b <- data_frame(color = c("green","yellow","pink"), size = c("S","M","L")))
+# n'inclut que les observations trouvées à la fois dans "a" et "b" (joint automatiquement sur les variables qui apparaissent dans les deux tableaux)
+inner_join(a, b)
+# inclure les observations trouvées dans «a» ou «b»
+full_join(a, b)
+# inclure les observations trouvées dans "a"
+left_join(a, b)
+# inclure les observations trouvées dans"b"
+right_join(a, b)
+# right_join (a, b) est identique à left_join (b, a) sauf pour l'ordre des colonnes
+left_join(b, a)
+# filtrer "a" pour seulement montrer les observation qui matchent avec "b"
+semi_join(a, b)
+# filtrer "a" pour seulement montrer les observation qui matchent avec "b"
+anti_join(a, b)
+```
+
+
+```{r}
+# parfois les variables correspondantes n'ont pas de noms identiques
+b <- b %>% rename(col = color)
+# spécifier que la jointure doit se produire en faisant correspondre "couleur" dans "a" avec "col" dans "b"
+inner_join(a, b, by=c("color" = "col"))
+```
+
+
+## Viewing more output: print, View
+
+```{r}
+# indiquez que vous souhaitez voir plus de lignes
+flights %>% print(n = 15)
+```
+
+```{r eval=FALSE}
+# spécifiez que vous voulez voir TOUTES les lignes (ne l'exécutez pas!)
+flights %>% print(n = Inf)
+```
+
+```{r}
+#indiquez que vous souhaitez voir toutes les colonnes
+flights %>% print(width = Inf)
+```
+
+```{r eval=FALSE}
+# afficher jusqu'à 1000 lignes et toutes les colonnes
+flights %>% View()
+# définir l'option pour voir toutes les colonnes et moins de lignes
+options(dplyr.width = Inf, dplyr.print_min = 6)
+# réinitialiser les options (ou fermer simplement R)
+options(dplyr.width = NULL, dplyr.print_min = 10)
+```
